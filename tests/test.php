@@ -7,8 +7,8 @@
     require_once(__DIR__ . "/../src/Argument.php");
     require_once(__DIR__ . "/../src/Arguments.php");
 
-    use cliarguments\Argument;
-    use cliarguments\Arguments;
+    use pctlib\cliarguments\Argument;
+    use pctlib\cliarguments\Arguments;
 
     $arguments = [
         "FILESCANNER" => [

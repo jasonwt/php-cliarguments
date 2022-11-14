@@ -1,7 +1,7 @@
 <?php
     declare(strict_types=1);
         
-    namespace cliarguments;
+    namespace pctlib\cliarguments;
 
     error_reporting(E_ALL);
     ini_set('display_errors', '1');
@@ -127,8 +127,6 @@
 
             }
 
-            print_r($returnValue);
-
             foreach ($arguments as $argumentsGroupName => $argumentsGroupValue) {
                 if (count($argumentsGroupValue) == 0)
                     continue;
@@ -136,9 +134,21 @@
                 if (!isset($returnValue[$argumentsGroupName]))
                     $returnValue[$argumentsGroupName] = [];
 
-                foreach ($argumentsGroupValue as $argument) {                    
+                foreach ($argumentsGroupValue as $argument) {      
                     $argumentName        = $argument->GetName();
                     $argumentOptions     = $argument->GetOptions();
+                    
+                    if (!isset($returnValue[$argumentsGroupName]))
+                        $returnValue[$argumentsGroupName] = [];
+
+                    $argumentDefaultValue = $argument->GetDefaultValue();
+
+                    if (!isset($returnValue[$argumentsGroupName][$argumentName]))
+                        $returnValue[$argumentsGroupName][$argumentName] = $argumentDefaultValue;
+
+                    
+                    
+                    
                     $argumentReturnValue = $returnValue[$argumentsGroupName][$argumentName];
 
                     if ($argumentOptions <= 0)
