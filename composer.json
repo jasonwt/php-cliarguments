@@ -1,0 +1,17 @@
+{
+    "name": "pctlib/cliarguments",
+    "description": "CLI Arguments Helper",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "pctlib\\cliarguments\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jason Thompson"
+        }
+    ],
+    "require": {}
+}
