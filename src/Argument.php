@@ -20,7 +20,6 @@
         const NEW_PATH      = 16;
         const NEW_FILE      = 32;        
         
-
         public function __construct(string $name, string $description, $defaultValue, int $options = 0) {
             if (($this->name = trim($name)) == "")
                 throw new \Exception("name can not be empty");
