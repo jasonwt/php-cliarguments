@@ -6,33 +6,95 @@
 
     require_once(__DIR__ . "/../src/Argument.php");
     require_once(__DIR__ . "/../src/Arguments.php");
+    require_once(__DIR__ . "/../src/ArgumentableInterface.php");
 
     use pctlib\cliarguments\Argument;
     use pctlib\cliarguments\Arguments;
+    use pctlib\cliarguments\ArgumentableInterface;
 
-    $arguments = [
-        "FILESCANNER" => [
-            "scanPath"          => new Argument("scanPath", "The directory to scan.", "", Argument::REQUIRED + Argument::EXISTING_PATH),
-            "cachePath"         => new Argument("cachePath", "The directory to write the runtime cache files.", "./cache/", Argument::REQUIRED + Argument::EXISTING_PATH),
-            "logPath"           => new Argument("logPath", "The directory to write the mscan.log file.", "/var/log/", Argument::REQUIRED + Argument::EXISTING_PATH),
-            "findPath"          => new Argument("findPath", "System path to find. (default: which find)", null),
-            "diffPath"          => new Argument("diffPath", "System path to diff. (default: which diff)", null),
-            "shellPath"         => new Argument("shellPath", "System path to shell. (default: which bash)", null),
-            "editorPath"        => new Argument("editorPath", "System path to editor.  (default: which vi)", null),
-            "updateCacheFreq"   => new Argument("updateCacheFreq", "How often in seconds to update the find files and files info cache. -1 for no update. ", 0, Argument::REQUIRED + Argument::INT),
-            "maxHistoryRecords" => new Argument("maxHistoryRecords", "The maximum number of files info Runtime history to keep.", 3, Argument::REQUIRED + Argument::INT),
-            "maxScanFileSize"   => new Argument("maxScanFileSize", "The maximum file size to scan in bytes.", 32*1024*1024, Argument::REQUIRED + Argument::INT),
-            "include"           => new Argument("include", "Include file/folder wildcard path.  Include is processed before exclude.", []),
-            "exclude"           => new Argument("exclude", "Exclude file/folder wildcard path.", []),
-            "excludeMedia"      => new Argument("excludeMedia", "Exclude media type files. *.mp2 *.mp3, *.mp4, *.wav, *.wmv, *.mov, *.ogg, *.webm, *.mpeg", false),
-            "loadModule"        => new Argument("loadModule", "Path to scanning module file.", [], Argument::EXISTING_FILE),
-            "background"        => new Argument("background", "Run in background with no output or user input.", false)
-        ]
-    ];
+    class FileScannerModule implements ArgumentableInterface {
+        protected $parameters = [];
+
+        public function GetCLIArguments(): array {
+            return [
+                "scanPath2" => new Argument("scanPath2", "The directory to scan.", "", Argument::NEW_PATH)
+            ];
+        }
+
+        public function SetParameters(array $parameters) : bool {
+            $this->parameters = $parameters;
+            return true;
+        }
+    }
+
+    class FileScannerRuntimeIO implements ArgumentableInterface {
+        protected $parameters = [];
+        public function GetCLIArguments(): array {
+            return [
+                "runtimePath" => new Argument("runtimePath", "The directory to write the runtime files.", "./runtime/", Argument::REQUIRED + Argument::EXISTING_PATH)
+            ];
+        }
+
+        public function SetParameters(array $parameters) : bool {
+            $this->parameters = $parameters;
+            return true;
+        }
+    }
+
+    class FileScanner implements ArgumentableInterface {
+        protected $parameters = [];
+
+        protected array $modules = [];
+        protected $fileScannerRuntimeIOInterface;
+
+        public function __construct() {
+            $this->fileScannerRuntimeIOInterface = new FileScannerRuntimeIO();
+
+            $newModule = new FileScannerModule();
+
+            $this->modules[get_class($newModule)] = $newModule;
+        }
+
+        public function SetParameters(array $parameters) : bool {
+            $this->parameters = $parameters;
+            return true;
+        }
+
+        public function GetCLIArguments(): array { 
+            return [
+                "scanPath"   => new Argument("scanPath", "The directory to scan.", "", Argument::REQUIRED + Argument::NEW_PATH),
+                "includeDir" => new Argument("includeDir", "The directory to scan.", [], Argument::NEW_PATH),
+                "loadModule" => new Argument("loadModule", "Path to scanning module file.", [])
+            ];
+        }
+
+        public function Execute() {
+            $combinedArgumentsArray = [
+                "FILESCANNER" => $this
+            ];
+
+            //if ($this->fileScannerRuntimeIOInterface instanceof ArgumentableInterface) {
+                $combinedArgumentsArray["RUNTIME_IO"] = $this->fileScannerRuntimeIOInterface;//->GetCLIArguments();
+            //}
+
+            foreach ($this->modules as $moduleName => $module) {
+                //if ($module instanceof ArgumentableInterface) {
+                    $combinedArgumentsArray[$moduleName] = $module;//->GetCLIArguments();
+                //}
+            }
+
+//            print_r($combinedArgumentsArray);
+
+            if (($processedArguments = Arguments::Process($combinedArgumentsArray)) !== true)
+                die (Arguments::Usage($combinedArgumentsArray, $processedArguments));
+            
+//            print_r($processedArguments);
+        }
+    }
+
     
+    $fileScanner = new FileScanner();
+    $fileScanner->Execute();
 
-    if (!is_array(($results = Arguments::ProcessArguments($arguments))))
-        die("\nUsage: test.php [OPTIONS]\n" . Arguments::Usage($arguments, $results, 125) . "\n");
-
-    print_r($results);
+    print_r($fileScanner);
 ?>

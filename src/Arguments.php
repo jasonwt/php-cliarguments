@@ -7,10 +7,17 @@
     ini_set('display_errors', '1');
 
     require_once(__DIR__ . "/Argument.php");
+    require_once(__DIR__ . "/ArgumentableInterface.php");
 
     class Arguments {
-        public static function Usage(array $arguments, string $message, int $maxLineLength = 0) : string {
-            $returnValue = "";
+        public static function Usage(array $arguments, string $message, string $usageString = "", int $maxLineLength = 0) : string {
+
+            $arguments = array_filter($arguments, function ($v, $k) {return ($v instanceof ArgumentableInterface);}, ARRAY_FILTER_USE_BOTH);
+
+            $returnValue = "\n\n" . $usageString;
+
+            if (!$usageString)
+                $returnValue .= "USAGE " . $_SERVER["argv"][0] . " [OPTIONS]\n";
 
             if ($message)
                 $returnValue .= "\n  " . $message . "\n";
@@ -18,11 +25,13 @@
             $maxNameLength = 0;
 
             foreach ($arguments as $argumentsGroupName => $argumentsGroupValue) {
+                $argumentsGroupValue = $argumentsGroupValue->GetCLIArguments();
                 foreach ($argumentsGroupValue as $argument)
                     $maxNameLength = max($maxNameLength, strlen($argument->GetNameUsageLine()));
             }
             
             foreach ($arguments as $argumentsGroupName => $argumentsGroupValue) {
+                $argumentsGroupValue = $argumentsGroupValue->GetCLIArguments();
                 if (count($argumentsGroupValue) == 0)
                     continue;
 
@@ -35,11 +44,13 @@
             return $returnValue;
         }
 
-        public static function ProcessArguments(array $arguments) {
+        public static function Process(array $arguments) {
             $returnValue = [];
 
+            $arguments = array_filter($arguments, function ($v, $k) {return ($v instanceof ArgumentableInterface);}, ARRAY_FILTER_USE_BOTH);
+
             $argv = $_SERVER["argv"];
-            
+
             for ($acnt = 1; $acnt < count($argv); $acnt ++) {
                 
                 if (substr($argv[$acnt], 0, 2) != "--")
@@ -55,6 +66,8 @@
                 $argumentFound = false;
 
                 foreach ($arguments as $argumentsGroupName => $argumentsGroupValue) {
+                    $argumentsGroupValue = $argumentsGroupValue->GetCLIArguments();
+
                     if (count($argumentsGroupValue) == 0)
                         continue;
 
@@ -124,10 +137,11 @@
 
                 if (!$argumentFound)
                     return "Invalid argument '--$argName'";
-
             }
 
             foreach ($arguments as $argumentsGroupName => $argumentsGroupValue) {
+                $argumentsGroupValue = $argumentsGroupValue->GetCLIArguments();
+
                 if (count($argumentsGroupValue) == 0)
                     continue;
 
@@ -146,10 +160,7 @@
                     if (!isset($returnValue[$argumentsGroupName][$argumentName]))
                         $returnValue[$argumentsGroupName][$argumentName] = $argumentDefaultValue;
 
-                    
-                    
-                    
-                    $argumentReturnValue = $returnValue[$argumentsGroupName][$argumentName];
+                    $argumentReturnValue = &$returnValue[$argumentsGroupName][$argumentName];
 
                     if ($argumentOptions <= 0)
                         continue;
@@ -177,57 +188,87 @@
                         }
                     }
 
-                    if ($argumentOptions & Argument::EXISTING_FILE) {
+                    if (($argumentOptions & Argument::EXISTING_PATH) || ($argumentOptions & Argument::EXISTING_FILE)) {
                         if (is_array($argumentReturnValue)) {
-                            foreach ($argumentReturnValue as $k => $v) {
-                                if (!is_file($v))
-                                    return "--$argumentName: '$v' must be a existing file.";
-                            }                            
-                        } else {
-                            if (!is_file($argumentReturnValue))
-                                return "--$argumentName: '$argumentReturnValue' must be a existing file.";                            
-                        }
-                    }
+                            for ($ac = 0; $ac < count($argumentReturnValue); $ac ++) {
+                                $v = $argumentReturnValue[$ac];
 
-                    if ($argumentOptions & Argument::EXISTING_PATH) {
-                        if (is_array($argumentReturnValue)) {
-                            foreach ($argumentReturnValue as $k => $v) {
-                                if (!is_dir($v))
-                                    return "--$argumentName: '$v' must be a existing directory.";
-                            }                            
-                        } else {
-                            if (!is_dir($argumentReturnValue))
-                                return "--$argumentName: '$argumentReturnValue' must be a existing directory.";                            
-                        }
-                    }
+                                if (is_null($v))
+                                    continue;
 
-                    if ($argumentOptions & Argument::EXISTING_FILE) {
-                        if (is_array($argumentReturnValue)) {
-                            foreach ($argumentReturnValue as $k => $v) {
-                                if (!is_file($v))
-                                    return "--$argumentName: '$v' must be a existing file.";
+                                if ($argumentOptions & Argument::EXISTING_FILE && !is_file($v))
+                                    return "--$argumentName: '$v' is not a file or does not exist.";
+                                else if ($argumentOptions & Argument::EXISTING_PATH && !is_dir($v))
+                                    return "--$argumentName: '$v' is not a folder or does not exist.";
+
+                                if (is_dir($v)) {                                    
+                                    if ($v[0] != "/")
+                                        $argumentReturnValue[$ac] = getcwd() . "/" . $argumentReturnValue[$ac];
+
+                                    if (substr($v, -1) != "/")
+                                       $argumentReturnValue[$ac] .= "/";
+                                }
                             }                            
                         } else {
-                            if (!is_file($argumentReturnValue))
-                                return "--$argumentName: '$argumentReturnValue' must be a existing file.";                            
+                            if (!is_null($argumentReturnValue)) {
+                                if ($argumentOptions & Argument::EXISTING_FILE && !is_file($argumentReturnValue))
+                                    return "--$argumentName: '$argumentReturnValue' is not a file or does not exist.";
+                                else if ($argumentOptions & Argument::EXISTING_PATH && !is_dir($argumentReturnValue))
+                                    return "--$argumentName: '$argumentReturnValue' is not a folder or does not exist.";
+
+                                if (is_dir($argumentReturnValue)) {                                    
+                                    if ($argumentReturnValue[0] != "/")
+                                        $argumentReturnValue = getcwd() . "/" . $argumentReturnValue;
+
+                                    if (substr($argumentReturnValue, -1) != "/")
+                                        $argumentReturnValue .= "/";
+                                }
+                            }
                         }
                     }
 
                     if (($argumentOptions & Argument::NEW_PATH) || ($argumentOptions & Argument::NEW_FILE)) {
                         if (is_array($argumentReturnValue)) {
-                            foreach ($argumentReturnValue as $k => $v) {
+                            for ($ac = 0; $ac < count($argumentReturnValue); $ac ++) {
+                                $v = $argumentReturnValue[$ac];
+                                if (is_null($v))
+                                    continue;
+
                                 if (file_exists($v))
                                     return "--$argumentName: '$v' already exists.";
+
+                                if ($argumentOptions & Argument::NEW_PATH && $v != "") {                                    
+                                    if ($v[0] != "/")
+                                        $argumentReturnValue[$ac] = getcwd() . "/" . $argumentReturnValue[$ac];
+
+                                    if (substr($v[0], -1) != "/")
+                                        $argumentReturnValue[$ac] .= "/";
+                                }                                
                             }                            
                         } else {
-                            if (!is_dir($argumentReturnValue))
-                                return "--$argumentName: '$argumentReturnValue' already exists.";
+                            if (!is_null($argumentReturnValue)) {
+                                if (file_exists($argumentReturnValue))
+                                    return "--$argumentName: '$argumentReturnValue' already exists.";
+
+                                if ($argumentOptions & Argument::NEW_PATH && $argumentReturnValue != "") {                                    
+                                    if ($argumentReturnValue[0] != "/")
+                                        $argumentReturnValue = getcwd() . "/" . $argumentReturnValue;
+
+                                    if (substr($argumentReturnValue, -1) != "/")
+                                        $argumentReturnValue .= "/";
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            return $returnValue;
+            foreach ($returnValue as $k => $v) {
+                if (!$arguments[$k]->SetParameters($v))
+                    return $k . "->SetParameters() failed.";
+            }
+
+            return true;
         }
     }
 
